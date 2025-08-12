@@ -92,3 +92,8 @@ docker-compose exec nginx sh
 ```bash
 docker-compose up --build --force-recreate
 ```
+
+**Health containers:**
+```bash
+curl -vk https://localhost:8443/nginx-health
+```
