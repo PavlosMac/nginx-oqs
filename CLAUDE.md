@@ -58,8 +58,34 @@ curl http://localhost:8080/
 curl http://localhost:8080/api/data
 curl http://localhost:8080/health
 
-# Test HTTPS with post-quantum crypto (requires oqs-curl)
+# Test HTTPS with traditional TLS
 curl -k https://localhost:8443/nginx-health
+
+# Test HTTPS with post-quantum crypto (requires oqs-curl)
+docker run --rm --network host openquantumsafe/curl curl -k https://localhost:8443/nginx-health
+
+# Verify post-quantum algorithms in use
+docker run --rm --network host openquantumsafe/curl openssl s_client -connect localhost:8443 -servername localhost -provider oqsprovider -provider default
+```
+
+### Phase 1 Implementation Testing
+```bash
+# Step 1: Test OQS nginx container startup
+docker-compose up --build
+docker-compose ps  # Verify containers are running
+
+# Step 2: Test certificate generation
+docker run --rm -v $(pwd)/certs:/certs openquantumsafe/nginx:latest openssl req -x509 -new -newkey dilithium3 -keyout /certs/server-pq.key -out /certs/server-pq.crt -nodes -subj "/CN=localhost" -days 365 -provider oqsprovider -provider default
+
+# Step 3: Verify certificate structure
+openssl x509 -in certs/server-pq.crt -text -noout | grep "Public Key Algorithm"
+
+# Step 4: Test basic connectivity after each configuration change
+curl -v http://localhost:8080/nginx-health
+curl -k -v https://localhost:8443/nginx-health
+
+# Step 5: Test with post-quantum client
+docker run --rm --network host openquantumsafe/curl curl -k https://localhost:8443/
 ```
 
 ## Key Architecture Components
@@ -89,12 +115,26 @@ curl -k https://localhost:8443/nginx-health
 
 ## Post-Quantum Cryptography Integration
 
-This project implements the OQS integration plan documented in `planner.md`. Key aspects:
+This project implements Phase 1 of the OQS integration plan documented in `planner.md`. Current implementation status:
 
+### Phase 1: Infrastructure Setup ✅
+- **Docker Integration**: Using `openquantumsafe/nginx:latest` for post-quantum TLS support
+- **Certificate Strategy**: Hybrid approach with both traditional RSA and post-quantum Dilithium3 certificates
+- **Container-based Tools**: Certificate generation using OQS-enabled OpenSSL within containers
+- **Backward Compatibility**: Traditional clients continue to work seamlessly
+
+### Current Capabilities:
 - **Hybrid TLS**: Supports both traditional browsers and post-quantum clients
-- **Cipher Suites**: Kyber768 for key exchange, Dilithium3 for signatures
-- **Testing**: Use `oqs-curl` for post-quantum connectivity testing
-- **Performance**: Benchmarking available for traditional vs post-quantum algorithms
+- **Signature Algorithm**: Dilithium3 for post-quantum certificate signing
+- **Key Exchange**: Kyber768 support for post-quantum key agreement
+- **Testing Tools**: `openquantumsafe/curl` for post-quantum connectivity testing
+- **Certificate Management**: Automated generation scripts using OQS containers
+
+### Implementation Approach:
+1. **Incremental Rollout**: Each step is tested before proceeding
+2. **Container-first**: Uses official OQS Docker images to avoid local tooling complexity
+3. **Risk Mitigation**: Maintains existing traditional certificates alongside post-quantum ones
+4. **Testing Integration**: Comprehensive test commands for each implementation phase
 
 ## File Structure
 
